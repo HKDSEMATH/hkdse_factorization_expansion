@@ -8,14 +8,15 @@
     <script>
         MathJax = {
             tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
-            svg: { fontCache: 'global' }
+            output: { displayOverflow: 'scale', linebreaks: { inline: false } }
         };
     </script>
-    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-svg.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         /* Paper typography: question text in Times New Roman, unknowns italic */
-        #question-display, .qtext { font-family: 'Times New Roman', Times, serif; }
+        #question-display, #l3-blocks, .qtext { font-family: 'Times New Roman', Times, serif; }
         .mathvar { font-style: italic; }
 
         .glass-panel {
@@ -78,6 +79,64 @@
             background-color: rgba(245, 158, 11, 0.2) !important;
             color: #fde68a !important;
         }
+
+        /* ==== COLORFUL THEME + ANSWER ANIMATIONS ==== */
+        body {
+            background-image:
+                radial-gradient(ellipse 80% 50% at 15% -10%, rgba(99, 102, 241, 0.30), transparent 60%),
+                radial-gradient(ellipse 60% 45% at 85% -5%, rgba(217, 70, 239, 0.22), transparent 60%),
+                radial-gradient(ellipse 75% 50% at 50% 110%, rgba(34, 211, 238, 0.20), transparent 60%);
+            background-attachment: fixed;
+        }
+        #login-screen h1 {
+            background: linear-gradient(90deg, #fbbf24, #f472b6, #818cf8, #34d399);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+        #dashboard-screen .glass-panel:hover { box-shadow: 0 0 26px rgba(139, 92, 246, 0.25); }
+        @keyframes flashGreen {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+            50% { box-shadow: 0 0 42px 10px rgba(34, 197, 94, 0.55); }
+        }
+        @keyframes flashRed {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            30%, 60% { box-shadow: 0 0 48px 12px rgba(239, 68, 68, 0.6); }
+        }
+        .correct-flash { animation: flashGreen 0.7s ease-in-out; }
+        .wrong-flash { animation: flashRed 0.6s ease-in-out; }
+        @keyframes scoreBounce {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.45); }
+            100% { transform: scale(1); }
+        }
+        .score-bounce { animation: scoreBounce 0.5s ease; }
+        @keyframes heartBreakAnim {
+            0% { transform: scale(1); opacity: 1; }
+            40% { transform: scale(1.6); }
+            100% { transform: scale(0.4); opacity: 0.35; }
+        }
+        .heart-broken { display: inline-block; animation: heartBreakAnim 0.55s ease forwards; }
+        @keyframes badgeBounce {
+            0% { transform: scale(0.7); }
+            55% { transform: scale(1.12); }
+            100% { transform: scale(1); }
+        }
+        .badge-bounce { animation: badgeBounce 0.6s ease; }
+        /* Canonical inline-MathJax fix (family-wide, do not regress) */
+        #question-display mjx-container,
+        #l3-area mjx-container,
+        #l3-blocks mjx-container,
+        #mc-options mjx-container { margin: 0 0.25em !important; font-size: 1em !important; }
+        #question-display mjx-container svg,
+        #l3-area mjx-container svg,
+        #l3-blocks mjx-container svg,
+        #mc-options mjx-container svg { display: inline-block !important; }
+        .option-btn mjx-container { display: block; margin-left: auto !important; margin-right: auto !important; }
+        /* Canonical MC option box rules (family-wide, do not regress) */
+        #mc-options .option-btn { white-space: normal; overflow-wrap: break-word; word-break: break-word; }
+        #mc-options .option-btn > div { max-width: 100%; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex items-center justify-center p-4 selection:bg-amber-500 selection:text-white">
@@ -206,7 +265,7 @@
                     <h3 class="font-bold text-xl text-white group-hover:text-green-400 transition">Level 1</h3>
                     <span class="text-2xl group-hover:scale-110 transition">🟢</span>
                 </div>
-                <p class="text-slate-400 text-sm relative z-10">Expansion: remove brackets & simplify. \(a(x+y)\), \((x+a)(x+b)\), \((x+a)^2\). (Core)</p>
+                <p class="text-slate-400 text-sm relative z-10">Expansion: remove brackets &amp; simplify.<br>\(a(x+y)\)<br>\((x+a)(x+b)\)<br>\((x+a)^2\)<br>(Core)</p>
             </button>
 
             <button onclick="startGame(2)" class="glass-panel rounded-2xl p-6 text-left hover:-translate-y-1 transition duration-300 border-t-4 border-amber-500 group relative overflow-hidden">
@@ -227,7 +286,7 @@
         </div>
     </div>
 
-    <div id="game-screen" class="hidden w-full max-w-2xl flex flex-col gap-4">
+    <div id="game-screen" class="hidden w-full max-w-4xl flex flex-col gap-4">
         
         <div class="flex justify-between items-center bg-slate-800 rounded-full px-6 py-3 shadow-lg border border-slate-700">
             <div class="font-bold text-amber-400" id="level-indicator">Level 1</div>
@@ -242,12 +301,15 @@
                     ⭐ <span id="live-score">0</span>
                 </div>
             </div>
+            <button onclick="skipQuestion()" class="text-slate-500 hover:text-amber-400 transition text-xs font-bold uppercase tracking-wider mr-3">
+                Skip
+            </button>
             <button onclick="quitGame()" class="text-slate-500 hover:text-red-400 transition text-xs font-bold uppercase tracking-wider">
                 Abort
             </button>
         </div>
 
-        <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl text-center min-h-[350px] flex flex-col relative w-full overflow-hidden" id="main-game-area">
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl text-center min-h-[350px] flex flex-col relative w-full" id="main-game-area">
             
             <div class="w-full flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
                 <div class="flex flex-col text-left">
@@ -268,7 +330,7 @@
                 </div>
             </div>
 
-            <div id="question-display" class="text-3xl sm:text-4xl text-white mb-6 overflow-x-auto py-6 flex items-center justify-center min-h-[120px]">
+            <div id="question-display" class="text-2xl sm:text-3xl text-white mb-6 py-6 px-4 text-center min-h-[120px] max-w-full">
                 <!-- MathJax renders here -->
             </div>
             
@@ -393,10 +455,10 @@
         // Deployed Google Apps Script Web App URL
         const GOOGLE_SCRIPT_URL =
             'https://script.google.com/macros/s/AKfycbxpmwJ_BmXakqRHiHr5N57z6P4GPI_m_vkyIy7T9chnO4pbuH_aVrD0RUsj5nlYOOwY/exec';
-                const APP_VERSION = '1';
+
+        const APP_VERSION = '2';
         (function watchAppVersion() {
-            let file = (location.pathname.split('/').pop() || '').split('?')[0];
-            if (!file || !file.endsWith('.html')) file = 'index.html';
+            const file = (location.pathname.split('/').pop() || 'index.html').split('?')[0];
             const check = () => {
                 fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
                     .then(r => r.json())
@@ -415,7 +477,7 @@
         let badgeRecords = { level1: false, level2: false, level3: false };
         let currentLevel = 1;
         let currentQuestionIndex = 0;
-        let lives = 3;
+        let lives = 5;
         let currentQuestions = [];
         let selectedFormat = 'all'; // 'all', 'mc', 'fill'
         let currentQuestionMode = 'mc'; // state for current specific question
@@ -430,6 +492,9 @@
             2: { full: 9, perHeart: 3 },
             3: { full: 15, perHeart: 5 }
         };
+        const NUM_QUESTIONS = 5;
+        const LEVEL3_SETS = 5;
+        const LEVEL_LIVES = { 1: 5, 2: 5, 3: 5 };
         let scoreTotals = { level1: 0, level2: 0, level3: 0 };
         
         // Tracking variables for correct percentage
@@ -1176,6 +1241,61 @@
             return prefix + inners.map(i => `(${i})`).join('');
         }
 
+        // --- COLORFUL ANSWER ANIMATIONS (confetti / flash / bounce) ---
+        function celebrate(big) {
+            if (typeof confetti === 'undefined') return;
+            confetti({
+                particleCount: big ? 170 : 70,
+                spread: big ? 100 : 60,
+                startVelocity: big ? 40 : 25,
+                origin: { y: 0.6 },
+                colors: ['#fbbf24', '#f472b6', '#818cf8', '#34d399', '#22d3ee', '#f87171']
+            });
+        }
+        function animateCorrect() {
+            celebrate(false);
+            const area = document.getElementById('main-game-area');
+            if (area) {
+                area.classList.remove('correct-flash', 'wrong-flash');
+                void area.offsetWidth;
+                area.classList.add('correct-flash');
+            }
+            const sc = document.getElementById('live-score');
+            if (sc) {
+                sc.classList.remove('score-bounce');
+                void sc.offsetWidth;
+                sc.classList.add('score-bounce');
+            }
+        }
+        function animateWrong() {
+            const area = document.getElementById('main-game-area');
+            if (area) {
+                area.classList.remove('correct-flash', 'wrong-flash');
+                void area.offsetWidth;
+                area.classList.add('wrong-flash');
+            }
+        }
+        function heartBreak() {
+            const c = document.getElementById('lives-container');
+            if (!c) return;
+            const spans = c.querySelectorAll('span');
+            const dead = spans[lives];
+            if (dead) {
+                dead.textContent = '💔';
+                dead.classList.remove('opacity-30', 'grayscale');
+                dead.classList.add('heart-broken');
+            }
+        }
+        function celebrateBig() {
+            celebrate(true);
+            const badge = document.getElementById('badge-card-' + currentLevel);
+            if (badge) {
+                badge.classList.remove('badge-bounce');
+                void badge.offsetWidth;
+                badge.classList.add('badge-bounce');
+            }
+        }
+
         // --- CORE GAME LOGIC ---
 
         function login() {
@@ -1283,7 +1403,7 @@
         function currentAttemptMarks() {
             const cfg = MARKS[currentLevel];
             if (!cfg) return 0;
-            const heartsLost = Math.max(0, 3 - lives);
+            const heartsLost = Math.max(0, LEVEL_LIVES[currentLevel] - lives);
             return Math.max(0, cfg.full - heartsLost * cfg.perHeart);
         }
 
@@ -1312,7 +1432,7 @@
             document.getElementById('level-indicator').className = `font-bold ${levelColors[level-1]}`;
             document.getElementById('level-indicator').textContent = `Level ${level}`;
 
-            lives = 3;
+            lives = LEVEL_LIVES[level];
             currentQuestionIndex = 0;
             currentQuestions = [];
             currentSets = [];
@@ -1325,7 +1445,7 @@
                 const usedTexts = new Set();
                 const usedOpts = new Set();
                 const usedAns = new Set();
-                for (let i = 0; i < 5; i++) {
+                for (let i = 0; i < LEVEL3_SETS; i++) {
                     let parts = null, tKey = null, oKey = null, aKey = null, tries = 0;
                     do {
                         parts = MathGen.generateL3Set();
@@ -1357,7 +1477,7 @@
             const usedTexts = new Set();
             const usedOpts = new Set();
             const usedAns = new Set();
-            for(let i=0; i<10; i++) {
+            for(let i=0; i<NUM_QUESTIONS; i++) {
                 let q = null, tKey = null, oKey = null, aKey = null, tries = 0;
                 do {
                     q = (level === 1) ? MathGen.generateL1() : MathGen.generateL2();
@@ -1382,7 +1502,7 @@
             for (let i = 0; i < lives; i++) {
                 container.innerHTML += '<span class="heart-bounce">❤️</span>';
             }
-            for (let i = lives; i < 3; i++) {
+            for (let i = lives; i < LEVEL_LIVES[currentLevel]; i++) {
                 container.innerHTML += '<span class="opacity-30 grayscale">❤️</span>';
             }
         }
@@ -1424,7 +1544,7 @@
                 
                 const btns = mcArea.querySelectorAll('button');
                 btns.forEach((btn, idx) => {
-                    btn.innerHTML = q.options[idx];
+                    btn.innerHTML = '<div class="w-full text-center">' + q.options[idx] + '</div>';
                 });
             } else {
                 mcArea.classList.add('hidden');
@@ -1549,13 +1669,13 @@
                 <span class="text-sm font-bold text-emerald-400">Part ${part.partLabel}</span>
                 <span id="l3-status-${pi}" class="${part.done ? 'text-green-400' : 'text-slate-400'} text-sm font-semibold">${part.done ? '✓ Correct' : ''}</span>
             </div>`;
-            inner += `<div id="l3-q-${pi}" class="text-xl sm:text-2xl text-white mb-3 text-center overflow-x-auto min-h-[40px] flex items-center justify-center">$ \\text{Factorize } ${part.displayTex} $</div>`;
+            inner += `<div id="l3-q-${pi}" class="text-xl sm:text-2xl text-white mb-3 text-center min-h-[40px]">$ \\text{Factorize } ${part.displayTex} $</div>`;
             if (part.done) {
                 inner += `<div class="text-center text-green-400 text-sm py-2 font-semibold">Answer: $ ${part.mcAnswerStr} $</div>`;
             } else if (part.mode === 'mc') {
                 inner += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="l3-mc-${pi}">`;
                 part.options.forEach((o, bi) => {
-                    inner += `<button onclick="submitSetPartMC(${pi}, ${bi})" class="option-btn bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl p-3 text-lg transition-all shadow-md active:scale-95 min-h-[56px] flex items-center justify-center">${o}</button>`;
+                    inner += `<button onclick="submitSetPartMC(${pi}, ${bi})" class="option-btn bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl p-3 text-lg transition-all shadow-md active:scale-95 min-h-[56px] flex items-center justify-center"><div class="w-full text-center">${o}</div></button>`;
                 });
                 inner += `</div>`;
             } else {
@@ -1591,7 +1711,8 @@
                 showToast(`Part ${currentSets[currentSetIndex][pi].partLabel} correct! Awesome job.`, "success");
                 
                 const set = currentSets[currentSetIndex];
-                set[pi].done = true;
+                                animateCorrect();
+                                set[pi].done = true;
                 rebuildL3Block(pi);
                 
                 if (set.every(p => p.done)) {
@@ -1605,7 +1726,8 @@
                     }, 700);
                 }
             } else {
-                showWrongReflectionModal();
+                                animateWrong();
+                                showWrongReflectionModal();
             }
         }
 
@@ -1667,7 +1789,8 @@
             if (isCorrect) {
                 // Track correct attempts
                 levelStats[`level${currentLevel}`].correct++;
-                showToast("Correct! Awesome job.", "success");
+                                animateCorrect();
+                                showToast("Correct! Awesome job.", "success");
                 currentQuestionIndex++;
                 
                 if (currentQuestionIndex >= currentQuestions.length) {
@@ -1677,7 +1800,8 @@
                 }
             } else {
                 // Instantly pop up the wrong reflection modal before deducting life
-                showWrongReflectionModal();
+                                animateWrong();
+                                showWrongReflectionModal();
             }
         }
 
@@ -1705,6 +1829,7 @@
             // Deduct life and shake the game screen to indicate a mistake
             lives--;
             updateLivesUI();
+            heartBreak();
             updateLiveScore();
             showWrongFeedback();
             
@@ -1721,12 +1846,55 @@
         }
 
         function winGame() {
-            badgeRecords[`level${currentLevel}`] = true;
+                        badgeRecords[`level${currentLevel}`] = true;
+            celebrateBig();
             const earned = currentAttemptMarks();
             scoreTotals[`level${currentLevel}`] += earned;
             saveScores();
             showToast(`Level ${currentLevel} Complete! +${earned} marks earned! 🏆`, "success");
             quitGame();
+        }
+        // Skip the current question/set: no mark or life is lost.
+        function skipQuestion() {
+            if (currentLevel === 3) {
+                const usedTexts = new Set(currentSets.map(s => s.map(p => p.displayTex).join('|')));
+                const usedOpts = new Set(currentSets.map(s => s.map(p => [...p.options].sort().join('~')).join('|')));
+                const usedAns = new Set(currentSets.map(s => s.map(p => p.answerStr).join('|')));
+                let parts = null, tKey = null, oKey = null, aKey = null, tries = 0;
+                do {
+                    parts = MathGen.generateL3Set();
+                    tKey = parts.map(p => p.displayTex).join('|');
+                    oKey = parts.map(p => [...p.options].sort().join('~')).join('|');
+                    aKey = parts.map(p => p.answerStr).join('|');
+                    tries++;
+                } while ((usedTexts.has(tKey) || usedOpts.has(oKey) || usedAns.has(aKey)) && tries < 100);
+                parts.forEach((part, pi) => {
+                    part.setNo = currentSetIndex + 1;
+                    part.partIdx = pi;
+                    part.partLabel = ['(a)', '(b)', '(c)'][pi];
+                    part.paper = 'Paper 1';
+                    part.done = false;
+                    part.mode = (selectedFormat === 'all') ? (Math.random() > 0.5 ? 'mc' : 'fill') : selectedFormat;
+                });
+                currentSets[currentSetIndex] = parts;
+                activePart = null;
+                renderSet();
+                return;
+            }
+
+            const usedTexts = new Set(currentQuestions.map(q => q.text));
+            const usedOpts = new Set(currentQuestions.map(q => [...q.options].sort().join('~')));
+            const usedAns = new Set(currentQuestions.map(q => q.answerStr));
+            let q = null, tKey = null, oKey = null, aKey = null, tries = 0;
+            do {
+                q = (currentLevel === 1) ? MathGen.generateL1() : MathGen.generateL2();
+                tKey = q.text;
+                oKey = [...q.options].sort().join('~');
+                aKey = q.answerStr;
+                tries++;
+            } while ((usedTexts.has(tKey) || usedOpts.has(oKey) || usedAns.has(aKey)) && tries < 300);
+            currentQuestions[currentQuestionIndex] = q;
+            renderQuestion();
         }
 
         function quitGame() {
